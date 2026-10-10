@@ -60,3 +60,8 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# XcodeGen が生成するもの（project.yml が正）
+*.xcodeproj
+Sources/Info.plist
+build/
