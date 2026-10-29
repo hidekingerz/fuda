@@ -45,13 +45,23 @@ final class ClipboardMonitor {
         let types = pasteboard.types ?? []
         if types.contains(where: Self.ignoredTypes.contains) { return }
 
-        guard let text = pasteboard.string(forType: .string),
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-
         do {
-            try store.record(text)
+            if let fileContent = Self.fileContent(from: pasteboard) {
+                try store.record(fileContent, type: .file)
+            } else if let text = pasteboard.string(forType: .string),
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                try store.record(text, type: .text)
+            }
         } catch {
             NSLog("履歴の保存に失敗: \(error)")
         }
+    }
+
+    /// Finder などでコピーされたファイル URL を、改行区切りのパス文字列にする。
+    static func fileContent(from pasteboard: NSPasteboard) -> String? {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL],
+              !urls.isEmpty else { return nil }
+        return ClipboardItem.fileContent(paths: urls.map(\.path))
     }
 }

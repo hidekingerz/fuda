@@ -44,3 +44,37 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(contents, ["item4", "item3", "keep"])
     }
 }
+
+@MainActor
+final class FileHistoryTests: XCTestCase {
+    func testSameContentWithDifferentTypeIsSeparateItem() throws {
+        let container = try PersistenceController.inMemory()
+        let store = HistoryStore(context: container.mainContext)
+        try store.record("/tmp/a.txt", type: .text, at: Date(timeIntervalSince1970: 1))
+        try store.record("/tmp/a.txt", type: .file, at: Date(timeIntervalSince1970: 2))
+        let all = try store.fetchAll()
+        XCTAssertEqual(all.count, 2)
+        XCTAssertEqual(all.map(\.type), [.file, .text])
+    }
+
+    func testFileItemExposesURLsAndMissingState() throws {
+        let existing = FileManager.default.temporaryDirectory.appendingPathComponent("fuda-\(UUID().uuidString).txt")
+        try "x".write(to: existing, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: existing) }
+
+        let item = ClipboardItem(content: ClipboardItem.fileContent(paths: [existing.path]), type: .file)
+        XCTAssertEqual(item.fileURLs.map(\.path), [existing.path])
+        XCTAssertFalse(item.hasMissingFile)
+
+        let missing = ClipboardItem(content: "/nonexistent/fuda/file.txt", type: .file)
+        XCTAssertTrue(missing.hasMissingFile)
+        XCTAssertFalse(PanelEntry.history(missing).isPastable)
+        XCTAssertEqual(PanelEntry.history(missing).title, "file.txt")
+        XCTAssertEqual(PanelEntry.history(missing).subtitle, "/nonexistent/fuda")
+    }
+
+    func testTextItemsAreAlwaysPastable() {
+        XCTAssertTrue(PanelEntry.history(ClipboardItem(content: "hello")).isPastable)
+        XCTAssertNil(PanelEntry.history(ClipboardItem(content: "hello")).subtitle)
+    }
+}

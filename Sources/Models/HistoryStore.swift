@@ -26,7 +26,7 @@ final class HistoryStore {
     @discardableResult
     func record(_ content: String, type: ClipboardItemType = .text, at date: Date = .now, limit: Int? = nil) throws -> ClipboardItem {
         let item: ClipboardItem
-        if let existing = try fetchExisting(content: content) {
+        if let existing = try fetchExisting(content: content, type: type) {
             existing.createdAt = date
             item = existing
         } else {
@@ -70,9 +70,10 @@ final class HistoryStore {
         return try context.fetch(descriptor)
     }
 
-    private func fetchExisting(content: String) throws -> ClipboardItem? {
+    private func fetchExisting(content: String, type: ClipboardItemType) throws -> ClipboardItem? {
+        let typeRawValue = type.rawValue
         var descriptor = FetchDescriptor<ClipboardItem>(
-            predicate: #Predicate { $0.content == content }
+            predicate: #Predicate { $0.content == content && $0.typeRawValue == typeRawValue }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

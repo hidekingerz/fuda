@@ -23,9 +23,37 @@ enum PanelEntry: Identifiable, Hashable {
     /// 一覧に表示する見出し。
     var title: String {
         switch self {
-        case .history(let item): item.content.firstLine
-        case .snippet(let snippet): snippet.title
+        case .history(let item):
+            item.type == .file
+                ? item.fileURLs.map(\.lastPathComponent).joined(separator: ", ")
+                : item.content.firstLine
+        case .snippet(let snippet):
+            snippet.title
         }
+    }
+
+    /// 一覧の 2 行目（ファイルなら親ディレクトリ、スニペットなら内容の先頭行）。
+    var subtitle: String? {
+        switch self {
+        case .history(let item):
+            guard item.type == .file, let first = item.fileURLs.first else { return nil }
+            return first.deletingLastPathComponent().path
+        case .snippet(let snippet):
+            return snippet.content.firstLine
+        }
+    }
+
+    var historyItem: ClipboardItem? {
+        if case .history(let item) = self { return item }
+        return nil
+    }
+
+    var isFile: Bool { historyItem?.type == .file }
+
+    /// ファイル項目で実体が消えている場合は貼り付けできない。
+    var isPastable: Bool {
+        guard let item = historyItem, item.type == .file else { return true }
+        return !item.hasMissingFile
     }
 
     var isSnippet: Bool {
