@@ -135,21 +135,25 @@ private struct PanelRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: entry.isSnippet ? "text.quote" : (entry.isPinned ? "pin.fill" : "doc.on.clipboard"))
-                .foregroundStyle(isSelected ? .white : .secondary)
+            icon
                 .frame(width: 16)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title.isEmpty ? "(空白)" : entry.title)
                     .lineLimit(1)
                     .font(.system(size: 13, weight: entry.isSnippet ? .semibold : .regular))
-                if entry.isSnippet {
-                    Text(entry.content.firstLine)
+                if let subtitle = entry.subtitle {
+                    Text(subtitle)
                         .lineLimit(1)
                         .font(.system(size: 11))
                         .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
                 }
             }
             Spacer()
+            if !entry.isPastable {
+                Text("見つかりません")
+                    .font(.system(size: 10))
+                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+            }
             if entry.isSnippet {
                 Text("snippet")
                     .font(.system(size: 10))
@@ -159,12 +163,27 @@ private struct PanelRow: View {
             }
         }
         .foregroundStyle(isSelected ? .white : .primary)
+        .opacity(entry.isPastable ? 1 : 0.5)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(isSelected ? Color.accentColor : .clear)
         )
+    }
+}
+
+private extension PanelRow {
+    @ViewBuilder
+    var icon: some View {
+        if let item = entry.historyItem, item.type == .file, let url = item.fileURLs.first {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                .resizable()
+                .frame(width: 16, height: 16)
+        } else {
+            Image(systemName: entry.isSnippet ? "text.quote" : (entry.isPinned ? "pin.fill" : "doc.on.clipboard"))
+                .foregroundStyle(isSelected ? .white : .secondary)
+        }
     }
 }
 

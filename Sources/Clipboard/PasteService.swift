@@ -10,6 +10,23 @@ enum PasteService {
         pasteboard.setString(content, forType: .string)
     }
 
+    /// ファイル URL を書き込む。Finder には file-url、テキスト欄にはパスとして貼り付く。
+    static func copyToPasteboard(fileURLs: [URL]) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects(fileURLs as [NSURL])
+        pasteboard.setString(fileURLs.map(\.path).joined(separator: "\n"), forType: .string)
+    }
+
+    /// パネルの項目をペーストボードへ書き込む。
+    static func copyToPasteboard(_ entry: PanelEntry) {
+        if let item = entry.historyItem, item.type == .file {
+            copyToPasteboard(fileURLs: item.fileURLs)
+        } else {
+            copyToPasteboard(entry.content)
+        }
+    }
+
     /// Cmd+V を CGEvent で送信する。Accessibility 権限が必要。
     static func sendCommandV() {
         let source = CGEventSource(stateID: .combinedSessionState)
@@ -24,8 +41,8 @@ enum PasteService {
 
     /// 対象アプリを前面にしてから貼り付ける。
     @MainActor
-    static func paste(_ content: String, into app: NSRunningApplication?) {
-        copyToPasteboard(content)
+    static func paste(_ entry: PanelEntry, into app: NSRunningApplication?) {
+        copyToPasteboard(entry)
         guard AccessibilityPermission.isTrusted else {
             AccessibilityPermission.showGuideAlert()
             return

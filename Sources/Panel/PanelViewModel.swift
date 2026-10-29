@@ -76,6 +76,10 @@ final class PanelViewModel: ObservableObject {
 
     func confirmSelection() {
         guard let entry = selectedEntry else { return }
+        guard entry.isPastable else {
+            errorMessage = "ファイルが見つからないため貼り付けできません"
+            return
+        }
         onConfirm?(entry)
     }
 

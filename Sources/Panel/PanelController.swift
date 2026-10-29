@@ -70,7 +70,7 @@ final class PanelController {
     private func paste(_ entry: PanelEntry) {
         let target = previousApp
         hide()
-        PasteService.paste(entry.content, into: target)
+        PasteService.paste(entry, into: target)
     }
 
     // MARK: - 配置
