@@ -3,7 +3,7 @@ import SwiftData
 
 /// SwiftData の ModelContainer を 1 つだけ持つ。
 enum PersistenceController {
-    static let schema = Schema([ClipboardItem.self, Snippet.self])
+    static let schema = Schema([ClipboardItem.self, Snippet.self, PasteEvent.self])
 
     static let shared: ModelContainer = {
         do {

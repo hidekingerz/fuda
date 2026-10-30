@@ -51,6 +51,20 @@ struct PanelView: View {
                 .font(.system(size: 16))
                 .focused($searchFocused)
                 .onSubmit { viewModel.confirmSelection() }
+            Menu {
+                Picker("並び順", selection: $viewModel.sortOrder) {
+                    ForEach(PanelSortOrder.allCases) { order in
+                        Text(order.label).tag(order)
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("並び順: \(viewModel.sortOrder.label)")
             Button {
                 viewModel.beginNewSnippet()
             } label: {
@@ -84,7 +98,8 @@ struct PanelView: View {
                         PanelRow(
                             entry: entry,
                             isSelected: index == viewModel.selectedIndex,
-                            isKeywordMatch: viewModel.keywordMatches.contains(entry.id)
+                            isKeywordMatch: viewModel.keywordMatches.contains(entry.id),
+                            usageCount: viewModel.usageCount(for: entry)
                         )
                             .id(entry.id)
                             .contentShape(Rectangle())
@@ -124,6 +139,10 @@ struct PanelView: View {
             KeyHint(key: "⌘E", label: "編集")
             KeyHint(key: "esc", label: "閉じる")
             Spacer()
+            if viewModel.sortOrder != .newest {
+                Text(viewModel.sortOrder.label)
+                    .foregroundStyle(.secondary)
+            }
             Text("\(viewModel.results.count) 件")
                 .foregroundStyle(.secondary)
         }
@@ -137,6 +156,7 @@ private struct PanelRow: View {
     let entry: PanelEntry
     let isSelected: Bool
     let isKeywordMatch: Bool
+    let usageCount: Int
 
     var body: some View {
         HStack(spacing: 10) {
@@ -154,6 +174,12 @@ private struct PanelRow: View {
                 }
             }
             Spacer()
+            if usageCount > 0 {
+                Text("×\(usageCount)")
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                    .help("貼り付け回数")
+            }
             if !entry.isPastable {
                 Text("見つかりません")
                     .font(.system(size: 10))
