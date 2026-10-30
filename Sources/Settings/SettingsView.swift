@@ -4,6 +4,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(HistoryStore.limitKey) private var historyLimit: Int = HistoryStore.defaultLimit
+    @AppStorage(HistoryStore.imageLimitKey) private var imageLimit: Int = HistoryStore.defaultImageLimit
+    @AppStorage(HistoryStore.imageMaxBytesKey) private var imageMaxBytes: Int = HistoryStore.defaultImageMaxBytes
     @AppStorage(PasteEventStore.retentionDaysKey) private var retentionDays: Int = PasteEventStore.defaultRetentionDays
     @State private var accessibilityTrusted = AccessibilityPermission.isTrusted
     @State private var pasteEventCount = 0
@@ -26,7 +28,21 @@ struct SettingsView: View {
                         Text("\(historyLimit) 件").foregroundStyle(.secondary)
                     }
                 }
-                Text("ピン留めした項目は上限の対象外です。")
+                Stepper(value: $imageLimit, in: 5...500, step: 5) {
+                    HStack {
+                        Text("画像の保存件数の上限")
+                        Spacer()
+                        Text("\(imageLimit) 件").foregroundStyle(.secondary)
+                    }
+                }
+                Stepper(value: $imageMaxBytes, in: 1_048_576...209_715_200, step: 1_048_576) {
+                    HStack {
+                        Text("保存する画像の最大サイズ")
+                        Spacer()
+                        Text(ImageProcessing.sizeText(bytes: imageMaxBytes)).foregroundStyle(.secondary)
+                    }
+                }
+                Text("ピン留めした項目は上限の対象外です。最大サイズを超える画像は保存しません。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

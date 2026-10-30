@@ -24,9 +24,11 @@ enum PanelEntry: Identifiable, Hashable {
     var title: String {
         switch self {
         case .history(let item):
-            item.type == .file
-                ? item.fileURLs.map(\.lastPathComponent).joined(separator: ", ")
-                : item.content.firstLine
+            switch item.type {
+            case .file: item.fileURLs.map(\.lastPathComponent).joined(separator: ", ")
+            case .image: item.imageTitle
+            case .text: item.content.firstLine
+            }
         case .snippet(let snippet):
             snippet.title
         }
@@ -36,8 +38,14 @@ enum PanelEntry: Identifiable, Hashable {
     var subtitle: String? {
         switch self {
         case .history(let item):
-            guard item.type == .file, let first = item.fileURLs.first else { return nil }
-            return first.deletingLastPathComponent().path
+            switch item.type {
+            case .file:
+                return item.fileURLs.first?.deletingLastPathComponent().path
+            case .image:
+                return item.imageData.map { "PNG · \(ImageProcessing.sizeText(bytes: $0.count))" }
+            case .text:
+                return nil
+            }
         case .snippet(let snippet):
             return snippet.content.firstLine
         }
@@ -49,6 +57,7 @@ enum PanelEntry: Identifiable, Hashable {
     }
 
     var isFile: Bool { historyItem?.type == .file }
+    var isImage: Bool { historyItem?.type == .image }
 
     /// ファイル項目で実体が消えている場合は貼り付けできない。
     var isPastable: Bool {
@@ -76,7 +85,7 @@ enum PanelEntry: Identifiable, Hashable {
     var searchableText: String {
         switch self {
         case .history(let item):
-            item.content
+            item.type == .image ? item.imageTitle : item.content
         case .snippet(let snippet):
             [snippet.title, snippet.keyword ?? "", snippet.content].joined(separator: "\n")
         }

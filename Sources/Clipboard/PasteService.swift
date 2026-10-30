@@ -18,11 +18,26 @@ enum PasteService {
         pasteboard.setString(fileURLs.map(\.path).joined(separator: "\n"), forType: .string)
     }
 
+    /// 画像を PNG と TIFF の両方で書き込む（TIFF しか受け付けないアプリ向け）。
+    static func copyToPasteboard(imageData: Data) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setData(imageData, forType: .png)
+        if let tiff = NSImage(data: imageData)?.tiffRepresentation {
+            pasteboard.setData(tiff, forType: .tiff)
+        }
+    }
+
     /// パネルの項目をペーストボードへ書き込む。
     static func copyToPasteboard(_ entry: PanelEntry) {
-        if let item = entry.historyItem, item.type == .file {
-            copyToPasteboard(fileURLs: item.fileURLs)
-        } else {
+        switch entry.historyItem?.type {
+        case .file?:
+            copyToPasteboard(fileURLs: entry.historyItem?.fileURLs ?? [])
+        case .image?:
+            if let data = entry.historyItem?.imageData {
+                copyToPasteboard(imageData: data)
+            }
+        default:
             copyToPasteboard(entry.content)
         }
     }

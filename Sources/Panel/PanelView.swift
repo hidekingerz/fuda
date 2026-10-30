@@ -161,7 +161,7 @@ private struct PanelRow: View {
     var body: some View {
         HStack(spacing: 10) {
             icon
-                .frame(width: 16)
+                .frame(width: entry.isImage ? 48 : 16)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title.isEmpty ? "(空白)" : entry.title)
                     .lineLimit(1)
@@ -222,6 +222,13 @@ private extension PanelRow {
             Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                 .resizable()
                 .frame(width: 16, height: 16)
+        } else if let thumbnail = entry.historyItem?.thumbnail {
+            Image(nsImage: thumbnail)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 48, height: 32)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(.quaternary))
         } else {
             Image(systemName: entry.isSnippet ? "text.quote" : (entry.isPinned ? "pin.fill" : "doc.on.clipboard"))
                 .foregroundStyle(isSelected ? .white : .secondary)
