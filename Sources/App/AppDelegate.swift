@@ -45,6 +45,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// `fuda://panel` でパネルを開く（`?q=検索語` で検索欄を埋める）。Raycast や Alfred、シェルからの呼び出し用。
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "fuda" {
+            switch url.host {
+            case "panel":
+                let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                    .queryItems?.first { $0.name == "q" }?.value
+                panel?.show(query: query)
+            case "settings": settings?.show()
+            default: NSLog("未対応の URL: \(url)")
+            }
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         monitor?.stop()
     }

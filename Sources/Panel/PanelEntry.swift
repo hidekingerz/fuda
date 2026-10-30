@@ -40,7 +40,7 @@ enum PanelEntry: Identifiable, Hashable {
         case .history(let item):
             switch item.type {
             case .file:
-                return item.fileURLs.first?.deletingLastPathComponent().path
+                return item.fileURLs.first.map { ($0.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath }
             case .image:
                 return item.imageData.map { "PNG · \(ImageProcessing.sizeText(bytes: $0.count))" }
             case .text:

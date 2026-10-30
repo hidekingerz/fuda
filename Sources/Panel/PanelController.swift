@@ -52,9 +52,13 @@ final class PanelController {
         if panel.isVisible { hide() } else { show() }
     }
 
-    func show() {
+    /// query を渡すと検索欄にその文字列を入れた状態で開く。
+    func show(query: String? = nil) {
         previousApp = NSWorkspace.shared.frontmostApplication
         viewModel.resetForShow()
+        if let query, !query.isEmpty {
+            viewModel.query = query
+        }
         panel.setContentSize(PanelTextSize.panelSize(for: .current))
         positionPanel()
         panel.makeKeyAndOrderFront(nil)

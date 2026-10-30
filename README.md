@@ -3,6 +3,14 @@
 macOS 用のクリップボード履歴＋スニペット管理アプリ。
 ショートカットでパネルを呼び出し、履歴または登録済みスニペットを選んで元のアプリに貼り付ける。
 
+<p align="center">
+  <img src="docs/images/panel.png" width="520" alt="fuda のパネル。ピン留めした履歴、スニペット、ファイル、テキスト履歴が並んでいる">
+</p>
+
+<p align="center">
+  <img src="docs/images/panel-search.png" width="520" alt="検索欄に sig と入力し、キーワードが一致したスニペットが先頭に固定されている">
+</p>
+
 ## 必要なもの
 
 - macOS 14 以降
@@ -41,6 +49,12 @@ xcodebuild test -project fuda.xcodeproj -scheme fuda -destination 'platform=macO
 | 選択中のスニペットを編集 | ⌘E または右クリック |
 | 履歴のピン留め・削除 | 右クリック |
 
+他のツールから開くには `fuda://panel` を使います。`fuda://panel?q=sig` のように `q` を付けると検索欄にその文字列を入れた状態で開きます。`fuda://settings` で設定ウィンドウが開きます。
+
+```sh
+open "fuda://panel?q=sig"
+```
+
 初回起動時にアクセシビリティ権限のダイアログが出ます。貼り付け（元アプリへの ⌘V 送信）に必要なので、
 システム設定 > プライバシーとセキュリティ > アクセシビリティ で fuda を許可してください。
 クリップボード履歴の取得自体は権限がなくても動きます。
@@ -57,3 +71,15 @@ xcodebuild test -project fuda.xcodeproj -scheme fuda -destination 'platform=macO
 - `docs/superpowers/specs` — 設計メモ
 
 データは `~/Library/Application Support/fuda/fuda.store` に保存されます。
+環境変数 `FUDA_STORE_PATH` で保存先を差し替えられます（デモやデバッグ用）。
+
+## スクリーンショットの撮り直し
+
+README の画像はデモ用ストアで撮っています。実際の履歴を写さないよう、次の手順で再現できます。
+
+```sh
+TEST_RUNNER_FUDA_DEMO_STORE=/path/to/demo.store xcodebuild test -project fuda.xcodeproj -scheme fuda \
+  -destination 'platform=macOS' -derivedDataPath build/DerivedData -only-testing:fudaTests/DemoStoreTests
+FUDA_STORE_PATH=/path/to/demo.store build/DerivedData/Build/Products/Debug/fuda.app/Contents/MacOS/fuda &
+open "fuda://panel"
+```
