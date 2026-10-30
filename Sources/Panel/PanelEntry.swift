@@ -56,6 +56,12 @@ enum PanelEntry: Identifiable, Hashable {
         return !item.hasMissingFile
     }
 
+    /// スニペットのキーワード。履歴には無い。
+    var keyword: String? {
+        if case .snippet(let snippet) = self { return snippet.keyword }
+        return nil
+    }
+
     var isSnippet: Bool {
         if case .snippet = self { return true }
         return false
@@ -88,6 +94,23 @@ enum PanelSearch {
             let haystack = text(item).lowercased()
             return terms.allSatisfy { haystack.contains($0) }
         }
+    }
+
+    /// query がキーワードと完全一致（前後空白無視・大文字小文字無視）するか。
+    static func matchesKeyword(_ keyword: String?, query: String) -> Bool {
+        guard let keyword, !keyword.isEmpty else { return false }
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedQuery.isEmpty else { return false }
+        return keyword.compare(normalizedQuery, options: [.caseInsensitive]) == .orderedSame
+    }
+
+    /// filter した上で、キーワード完全一致の項目を順序を保ったまま先頭へ移動する。
+    static func rank<T>(_ items: [T], query: String, text: (T) -> String, keyword: (T) -> String?) -> [T] {
+        let filtered = filter(items, query: query, text: text)
+        let exact = filtered.filter { matchesKeyword(keyword($0), query: query) }
+        guard !exact.isEmpty else { return filtered }
+        let rest = filtered.filter { !matchesKeyword(keyword($0), query: query) }
+        return exact + rest
     }
 }
 
