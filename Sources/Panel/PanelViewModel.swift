@@ -19,6 +19,16 @@ final class PanelViewModel: ObservableObject {
     @Published var selectedIndex: Int = 0
     @Published var mode: Mode = .list
     @Published var errorMessage: String?
+    @Published var sortOrder: PanelSortOrder = PanelSortOrder(
+        rawValue: UserDefaults.standard.string(forKey: PanelSortOrder.defaultsKey) ?? ""
+    ) ?? .newest {
+        didSet {
+            UserDefaults.standard.set(sortOrder.rawValue, forKey: PanelSortOrder.defaultsKey)
+            applyFilter(resetSelection: true)
+        }
+    }
+    /// 項目ごとの貼り付け回数と最終貼り付け日時。
+    @Published private(set) var usage: [PanelEntry.ID: UsageStats] = [:]
 
     /// Enter で確定したときに呼ばれる。
     var onConfirm: ((PanelEntry) -> Void)?
@@ -27,11 +37,13 @@ final class PanelViewModel: ObservableObject {
 
     private let historyStore: HistoryStore
     private let snippetStore: SnippetStore
+    private let pasteEventStore: PasteEventStore
     private var allEntries: [PanelEntry] = []
 
     init(context: ModelContext) {
         self.historyStore = HistoryStore(context: context)
         self.snippetStore = SnippetStore(context: context)
+        self.pasteEventStore = PasteEventStore(context: context)
     }
 
     var selectedEntry: PanelEntry? {
@@ -48,6 +60,10 @@ final class PanelViewModel: ObservableObject {
             let pinned = history.filter(\.isPinned)
             let unpinned = history.filter { !$0.isPinned }
             allEntries = pinned + snippets + unpinned
+            let stats = try pasteEventStore.usageStats()
+            usage = Dictionary(uniqueKeysWithValues: allEntries.compactMap { entry in
+                stats[PasteEvent.encode(entry.id)].map { (entry.id, $0) }
+            })
             applyFilter(resetSelection: false)
         } catch {
             errorMessage = "読み込みに失敗しました: \(error.localizedDescription)"
@@ -63,7 +79,8 @@ final class PanelViewModel: ObservableObject {
     }
 
     private func applyFilter(resetSelection: Bool) {
-        results = PanelSearch.rank(allEntries, query: query, text: \.searchableText, keyword: \.keyword)
+        let sorted = sortOrder.sort(allEntries) { usage[$0.id] ?? UsageStats() }
+        results = PanelSearch.rank(sorted, query: query, text: \.searchableText, keyword: \.keyword)
         keywordMatches = Set(results.filter { PanelSearch.matchesKeyword($0.keyword, query: query) }.map(\.id))
         if resetSelection || !results.indices.contains(selectedIndex) {
             selectedIndex = 0
@@ -94,6 +111,7 @@ final class PanelViewModel: ObservableObject {
 
     func delete(_ entry: PanelEntry) {
         do {
+            try pasteEventStore.delete(for: entry.id)
             switch entry {
             case .history(let item): try historyStore.delete(item)
             case .snippet(let snippet): try snippetStore.delete(snippet)
@@ -112,6 +130,20 @@ final class PanelViewModel: ObservableObject {
         } catch {
             errorMessage = "更新に失敗しました: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - 貼り付けイベント
+
+    func recordPaste(of entry: PanelEntry, to bundleID: String?) {
+        do {
+            try pasteEventStore.record(targetID: entry.id, targetBundleID: bundleID)
+        } catch {
+            NSLog("貼り付けイベントの記録に失敗: \(error)")
+        }
+    }
+
+    func usageCount(for entry: PanelEntry) -> Int {
+        usage[entry.id]?.count ?? 0
     }
 
     // MARK: - スニペットフォーム

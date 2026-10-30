@@ -39,13 +39,14 @@ enum PasteService {
         keyUp.post(tap: .cgSessionEventTap)
     }
 
-    /// 対象アプリを前面にしてから貼り付ける。
+    /// 対象アプリを前面にしてから貼り付ける。Cmd+V を送れた場合に true。
     @MainActor
-    static func paste(_ entry: PanelEntry, into app: NSRunningApplication?) {
+    @discardableResult
+    static func paste(_ entry: PanelEntry, into app: NSRunningApplication?) -> Bool {
         copyToPasteboard(entry)
         guard AccessibilityPermission.isTrusted else {
             AccessibilityPermission.showGuideAlert()
-            return
+            return false
         }
         if let app, !app.isActive {
             app.activate()
@@ -54,5 +55,6 @@ enum PasteService {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             sendCommandV()
         }
+        return true
     }
 }

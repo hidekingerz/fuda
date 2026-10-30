@@ -12,6 +12,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let context = PersistenceController.shared.mainContext
 
+        // 保持期間を過ぎた／対象が消えた貼り付けイベントを掃除する
+        let pasteEvents = PasteEventStore(context: context)
+        do {
+            try pasteEvents.prune(olderThan: PasteEventStore.configuredRetentionDays)
+            try pasteEvents.pruneOrphans()
+        } catch {
+            NSLog("貼り付けイベントの掃除に失敗: \(error)")
+        }
+
         let panel = PanelController(context: context)
         self.panel = panel
 
