@@ -30,8 +30,8 @@ final class PanelViewModel: ObservableObject {
     /// 項目ごとの貼り付け回数と最終貼り付け日時。
     @Published private(set) var usage: [PanelEntry.ID: UsageStats] = [:]
 
-    /// Enter で確定したときに呼ばれる。
-    var onConfirm: ((PanelEntry) -> Void)?
+    /// 項目を確定したときに呼ばれる。action は貼り付けかコピーのみか。
+    var onConfirm: ((PanelEntry, ConfirmAction) -> Void)?
     /// Esc で閉じるときに呼ばれる。
     var onDismiss: (() -> Void)?
 
@@ -94,13 +94,18 @@ final class PanelViewModel: ObservableObject {
         selectedIndex = min(max(selectedIndex + delta, 0), results.count - 1)
     }
 
-    func confirmSelection() {
+    /// 選択中の項目を確定する。action を省略すると設定された Enter の動作。
+    func confirmSelection(action: ConfirmAction? = nil) {
         guard let entry = selectedEntry else { return }
+        confirm(entry, action: action ?? ConfirmAction.current)
+    }
+
+    func confirm(_ entry: PanelEntry, action: ConfirmAction) {
         guard entry.isPastable else {
-            errorMessage = "ファイルが見つからないため貼り付けできません"
+            errorMessage = "ファイルが見つからないため\(action.label)できません"
             return
         }
-        onConfirm?(entry)
+        onConfirm?(entry, action)
     }
 
     func dismiss() {

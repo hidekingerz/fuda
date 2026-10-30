@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage(HistoryStore.imageMaxBytesKey) private var imageMaxBytes: Int = HistoryStore.defaultImageMaxBytes
     @AppStorage(PasteEventStore.retentionDaysKey) private var retentionDays: Int = PasteEventStore.defaultRetentionDays
     @AppStorage(PanelTextSize.defaultsKey) private var textSize: PanelTextSize = .large
+    @AppStorage(ConfirmAction.defaultsKey) private var enterAction: ConfirmAction = .default
     @State private var accessibilityTrusted = AccessibilityPermission.isTrusted
     @State private var pasteEventCount = 0
     @State private var confirmClear = false
@@ -20,6 +21,17 @@ struct SettingsView: View {
         Form {
             Section("ショートカット") {
                 KeyboardShortcuts.Recorder("パネルを開く:", name: .togglePanel)
+            }
+            Section("Enter の動作") {
+                Picker("⏎ で", selection: $enterAction) {
+                    ForEach(ConfirmAction.allCases) { action in
+                        Text(action.label).tag(action)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text("もう一方の動作は ⇧⏎ で行えます。「貼り付け」は元のアプリへ ⌘V を送るため、改行を含む内容をターミナルに貼ると各行が実行されます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("表示") {
                 Picker("パネルの文字サイズ", selection: $textSize) {
@@ -84,7 +96,7 @@ struct SettingsView: View {
                         Button("システム設定を開く") { AccessibilityPermission.openSystemSettings() }
                     }
                 }
-                Text("貼り付け（Cmd+V の送信）に必要です。")
+                Text("「貼り付け」（元のアプリへの ⌘V 送信）にだけ必要です。「コピーのみ」では使いません。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

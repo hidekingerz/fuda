@@ -4,6 +4,7 @@ struct PanelView: View {
     @ObservedObject var viewModel: PanelViewModel
     @FocusState private var searchFocused: Bool
     @AppStorage(PanelTextSize.defaultsKey) private var textSize: PanelTextSize = .large
+    @AppStorage(ConfirmAction.defaultsKey) private var enterAction: ConfirmAction = .default
 
     private var scale: CGFloat { textSize.scale }
 
@@ -125,6 +126,9 @@ struct PanelView: View {
 
     @ViewBuilder
     private func contextMenu(for entry: PanelEntry) -> some View {
+        Button("貼り付け") { viewModel.confirm(entry, action: .paste) }
+        Button("コピー") { viewModel.confirm(entry, action: .copyOnly) }
+        Divider()
         switch entry {
         case .history:
             Button(entry.isPinned ? "ピンを外す" : "ピン留め") { viewModel.togglePinned(entry) }
@@ -138,7 +142,8 @@ struct PanelView: View {
     private var footer: some View {
         HStack(spacing: 14) {
             KeyHint(key: "↑↓", label: "選択")
-            KeyHint(key: "⏎", label: "貼り付け")
+            KeyHint(key: "⏎", label: enterAction.shortLabel)
+            KeyHint(key: "⇧⏎", label: enterAction.alternate.shortLabel)
             KeyHint(key: "⌘N", label: "スニペット追加")
             KeyHint(key: "⌘E", label: "編集")
             KeyHint(key: "esc", label: "閉じる")

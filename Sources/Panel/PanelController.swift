@@ -28,7 +28,7 @@ final class PanelController {
         panel.isReleasedWhenClosed = false
         panel.contentView = NSHostingView(rootView: PanelView(viewModel: viewModel))
 
-        viewModel.onConfirm = { [weak self] entry in self?.paste(entry) }
+        viewModel.onConfirm = { [weak self] entry, action in self?.confirm(entry, action: action) }
         viewModel.onDismiss = { [weak self] in self?.hide() }
 
         NotificationCenter.default.addObserver(
@@ -70,13 +70,19 @@ final class PanelController {
         panel.orderOut(nil)
     }
 
-    // MARK: - 貼り付け
+    // MARK: - 確定
 
-    private func paste(_ entry: PanelEntry) {
+    /// コピーのみならペーストボードに書いて閉じる。貼り付けなら Cmd+V を送り、送れたときだけ記録する。
+    private func confirm(_ entry: PanelEntry, action: ConfirmAction) {
         let target = previousApp
         hide()
-        if PasteService.paste(entry, into: target) {
-            viewModel.recordPaste(of: entry, to: target?.bundleIdentifier)
+        switch action {
+        case .copyOnly:
+            PasteService.copyToPasteboard(entry)
+        case .paste:
+            if PasteService.paste(entry, into: target) {
+                viewModel.recordPaste(of: entry, to: target?.bundleIdentifier)
+            }
         }
     }
 
@@ -133,8 +139,10 @@ final class PanelController {
         case 125: // ↓
             viewModel.moveSelection(by: 1)
             return true
-        case 36, 76: // return / enter
-            viewModel.confirmSelection()
+        case 36, 76: // return / enter（⇧ でもう一方の動作）
+            viewModel.confirmSelection(
+                action: ConfirmAction.action(enterAction: .current, shift: flags.contains(.shift))
+            )
             return true
         default:
             break
