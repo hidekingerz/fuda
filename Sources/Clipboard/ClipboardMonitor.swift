@@ -51,10 +51,19 @@ final class ClipboardMonitor {
             } else if let text = pasteboard.string(forType: .string),
                       !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 try store.record(text, type: .text)
+            } else if let payload = Self.imagePayload(from: pasteboard) {
+                try store.recordImage(payload)
             }
         } catch {
             NSLog("履歴の保存に失敗: \(error)")
         }
+    }
+
+    /// スクリーンショットなどの画像を PNG に正規化する。上限サイズを超えるものは nil。
+    static func imagePayload(from pasteboard: NSPasteboard) -> ImagePayload? {
+        let data = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff)
+        guard let data else { return nil }
+        return ImageProcessing.payload(from: data, maxBytes: HistoryStore.configuredImageMaxBytes)
     }
 
     /// Finder などでコピーされたファイル URL を、改行区切りのパス文字列にする。
