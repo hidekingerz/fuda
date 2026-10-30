@@ -14,6 +14,8 @@ final class PanelViewModel: ObservableObject {
         didSet { applyFilter(resetSelection: true) }
     }
     @Published private(set) var results: [PanelEntry] = []
+    /// 検索文字列とキーワードが完全一致している項目の ID。
+    @Published private(set) var keywordMatches: Set<PanelEntry.ID> = []
     @Published var selectedIndex: Int = 0
     @Published var mode: Mode = .list
     @Published var errorMessage: String?
@@ -61,7 +63,8 @@ final class PanelViewModel: ObservableObject {
     }
 
     private func applyFilter(resetSelection: Bool) {
-        results = PanelSearch.filter(allEntries, query: query, text: \.searchableText)
+        results = PanelSearch.rank(allEntries, query: query, text: \.searchableText, keyword: \.keyword)
+        keywordMatches = Set(results.filter { PanelSearch.matchesKeyword($0.keyword, query: query) }.map(\.id))
         if resetSelection || !results.indices.contains(selectedIndex) {
             selectedIndex = 0
         }

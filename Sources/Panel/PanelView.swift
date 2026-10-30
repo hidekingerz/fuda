@@ -81,7 +81,11 @@ struct PanelView: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, entry in
-                        PanelRow(entry: entry, isSelected: index == viewModel.selectedIndex)
+                        PanelRow(
+                            entry: entry,
+                            isSelected: index == viewModel.selectedIndex,
+                            isKeywordMatch: viewModel.keywordMatches.contains(entry.id)
+                        )
                             .id(entry.id)
                             .contentShape(Rectangle())
                             .onTapGesture {
@@ -132,6 +136,7 @@ struct PanelView: View {
 private struct PanelRow: View {
     let entry: PanelEntry
     let isSelected: Bool
+    let isKeywordMatch: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -155,11 +160,11 @@ private struct PanelRow: View {
                     .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
             }
             if entry.isSnippet {
-                Text("snippet")
-                    .font(.system(size: 10))
+                Text(badgeText)
+                    .font(.system(size: 10, weight: isKeywordMatch ? .semibold : .regular))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Capsule().fill(isSelected ? .white.opacity(0.25) : Color.accentColor.opacity(0.15)))
+                    .background(Capsule().fill(badgeBackground))
             }
         }
         .foregroundStyle(isSelected ? .white : .primary)
@@ -174,6 +179,17 @@ private struct PanelRow: View {
 }
 
 private extension PanelRow {
+    var badgeText: String {
+        if isKeywordMatch, let keyword = entry.keyword { return "keyword: \(keyword)" }
+        if let keyword = entry.keyword { return keyword }
+        return "snippet"
+    }
+
+    var badgeBackground: Color {
+        if isSelected { return .white.opacity(0.25) }
+        return isKeywordMatch ? Color.orange.opacity(0.3) : Color.accentColor.opacity(0.15)
+    }
+
     @ViewBuilder
     var icon: some View {
         if let item = entry.historyItem, item.type == .file, let url = item.fileURLs.first {
