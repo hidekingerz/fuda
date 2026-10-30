@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage(HistoryStore.imageLimitKey) private var imageLimit: Int = HistoryStore.defaultImageLimit
     @AppStorage(HistoryStore.imageMaxBytesKey) private var imageMaxBytes: Int = HistoryStore.defaultImageMaxBytes
     @AppStorage(PasteEventStore.retentionDaysKey) private var retentionDays: Int = PasteEventStore.defaultRetentionDays
+    @AppStorage(PanelTextSize.defaultsKey) private var textSize: PanelTextSize = .large
     @State private var accessibilityTrusted = AccessibilityPermission.isTrusted
     @State private var pasteEventCount = 0
     @State private var confirmClear = false
@@ -19,6 +20,14 @@ struct SettingsView: View {
         Form {
             Section("ショートカット") {
                 KeyboardShortcuts.Recorder("パネルを開く:", name: .togglePanel)
+            }
+            Section("表示") {
+                Picker("パネルの文字サイズ", selection: $textSize) {
+                    ForEach(PanelTextSize.allCases) { size in
+                        Text(size.label).tag(size)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
             Section("履歴") {
                 Stepper(value: $historyLimit, in: 10...2000, step: 10) {

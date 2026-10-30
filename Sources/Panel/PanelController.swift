@@ -55,6 +55,7 @@ final class PanelController {
     func show() {
         previousApp = NSWorkspace.shared.frontmostApplication
         viewModel.resetForShow()
+        panel.setContentSize(PanelTextSize.panelSize(for: .current))
         positionPanel()
         panel.makeKeyAndOrderFront(nil)
         installKeyMonitor()
