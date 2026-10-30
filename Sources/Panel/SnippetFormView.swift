@@ -9,6 +9,7 @@ struct SnippetFormView: View {
     @State private var content: String
     @State private var keyword: String
     @FocusState private var titleFocused: Bool
+    @Environment(\.panelTextScale) private var scale
 
     init(viewModel: PanelViewModel, editing: Snippet?) {
         self.viewModel = viewModel
@@ -21,23 +22,25 @@ struct SnippetFormView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(editing == nil ? "スニペットを追加" : "スニペットを編集")
-                .font(.headline)
+                .font(.system(size: 15 * scale, weight: .semibold))
 
             TextField("タイトル", text: $title)
+                .font(.system(size: 13 * scale))
                 .textFieldStyle(.roundedBorder)
                 .focused($titleFocused)
 
             TextField("キーワード（任意）", text: $keyword)
+                .font(.system(size: 13 * scale))
                 .textFieldStyle(.roundedBorder)
 
             TextEditor(text: $content)
-                .font(.system(size: 13, design: .monospaced))
+                .font(.system(size: 13 * scale, design: .monospaced))
                 .frame(minHeight: 160)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
 
             if let message = viewModel.errorMessage {
                 Text(message)
-                    .font(.caption)
+                    .font(.system(size: 11 * scale))
                     .foregroundStyle(.red)
             }
 

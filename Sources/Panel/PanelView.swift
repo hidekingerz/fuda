@@ -3,6 +3,9 @@ import SwiftUI
 struct PanelView: View {
     @ObservedObject var viewModel: PanelViewModel
     @FocusState private var searchFocused: Bool
+    @AppStorage(PanelTextSize.defaultsKey) private var textSize: PanelTextSize = .large
+
+    private var scale: CGFloat { textSize.scale }
 
     var body: some View {
         Group {
@@ -13,8 +16,9 @@ struct PanelView: View {
                 SnippetFormView(viewModel: viewModel, editing: snippet)
             }
         }
-        .frame(width: 520, height: 420)
+        .frame(width: PanelTextSize.baseWidth * scale, height: PanelTextSize.baseHeight * scale)
         .background(.regularMaterial)
+        .environment(\.panelTextScale, scale)
     }
 
     private var listBody: some View {
@@ -23,7 +27,7 @@ struct PanelView: View {
             Divider()
             if let message = viewModel.errorMessage {
                 Text(message)
-                    .font(.caption)
+                    .font(.system(size: 11 * scale))
                     .foregroundStyle(.red)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
@@ -48,7 +52,7 @@ struct PanelView: View {
                 .foregroundStyle(.secondary)
             TextField("履歴とスニペットを検索", text: $viewModel.query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 16))
+                .font(.system(size: 16 * scale))
                 .focused($searchFocused)
                 .onSubmit { viewModel.confirmSelection() }
             Menu {
@@ -81,7 +85,7 @@ struct PanelView: View {
         VStack(spacing: 6) {
             Spacer()
             Image(systemName: "doc.on.clipboard")
-                .font(.system(size: 28))
+                .font(.system(size: 28 * scale))
                 .foregroundStyle(.tertiary)
             Text(viewModel.query.isEmpty ? "履歴はまだありません" : "一致する項目がありません")
                 .foregroundStyle(.secondary)
@@ -146,13 +150,14 @@ struct PanelView: View {
             Text("\(viewModel.results.count) 件")
                 .foregroundStyle(.secondary)
         }
-        .font(.caption)
+        .font(.system(size: 11 * scale))
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
     }
 }
 
 private struct PanelRow: View {
+    @Environment(\.panelTextScale) private var scale
     let entry: PanelEntry
     let isSelected: Bool
     let isKeywordMatch: Bool
@@ -161,33 +166,33 @@ private struct PanelRow: View {
     var body: some View {
         HStack(spacing: 10) {
             icon
-                .frame(width: entry.isImage ? 48 : 16)
+                .frame(width: (entry.isImage ? 48 : 16) * scale)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title.isEmpty ? "(空白)" : entry.title)
                     .lineLimit(1)
-                    .font(.system(size: 13, weight: entry.isSnippet ? .semibold : .regular))
+                    .font(.system(size: 13 * scale, weight: entry.isSnippet ? .semibold : .regular))
                 if let subtitle = entry.subtitle {
                     Text(subtitle)
                         .lineLimit(1)
-                        .font(.system(size: 11))
+                        .font(.system(size: 11 * scale))
                         .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
                 }
             }
             Spacer()
             if usageCount > 0 {
                 Text("×\(usageCount)")
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.system(size: 10 * scale, design: .rounded))
                     .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
                     .help("貼り付け回数")
             }
             if !entry.isPastable {
                 Text("見つかりません")
-                    .font(.system(size: 10))
+                    .font(.system(size: 10 * scale))
                     .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
             }
             if entry.isSnippet {
                 Text(badgeText)
-                    .font(.system(size: 10, weight: isKeywordMatch ? .semibold : .regular))
+                    .font(.system(size: 10 * scale, weight: isKeywordMatch ? .semibold : .regular))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(badgeBackground))
@@ -221,12 +226,12 @@ private extension PanelRow {
         if let item = entry.historyItem, item.type == .file, let url = item.fileURLs.first {
             Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                 .resizable()
-                .frame(width: 16, height: 16)
+                .frame(width: 16 * scale, height: 16 * scale)
         } else if let thumbnail = entry.historyItem?.thumbnail {
             Image(nsImage: thumbnail)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 48, height: 32)
+                .frame(width: 48 * scale, height: 32 * scale)
                 .clipShape(RoundedRectangle(cornerRadius: 3))
                 .overlay(RoundedRectangle(cornerRadius: 3).stroke(.quaternary))
         } else {
@@ -237,13 +242,14 @@ private extension PanelRow {
 }
 
 private struct KeyHint: View {
+    @Environment(\.panelTextScale) private var scale
     let key: String
     let label: String
 
     var body: some View {
         HStack(spacing: 4) {
             Text(key)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 10 * scale, weight: .medium, design: .rounded))
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1)
                 .background(RoundedRectangle(cornerRadius: 3).fill(.quaternary))
