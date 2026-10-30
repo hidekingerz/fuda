@@ -71,6 +71,8 @@ final class FileHistoryTests: XCTestCase {
         XCTAssertFalse(PanelEntry.history(missing).isPastable)
         XCTAssertEqual(PanelEntry.history(missing).title, "file.txt")
         XCTAssertEqual(PanelEntry.history(missing).subtitle, "/nonexistent/fuda")
+        let home = ClipboardItem(content: NSHomeDirectory() + "/Downloads/a.pdf", type: .file)
+        XCTAssertEqual(PanelEntry.history(home).subtitle, "~/Downloads")
     }
 
     func testTextItemsAreAlwaysPastable() {
