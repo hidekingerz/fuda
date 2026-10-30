@@ -38,6 +38,9 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: "© 2026 hidekingerz"
         NSPrincipalClass: NSApplication
+        CFBundleURLTypes:
+          - CFBundleURLName: com.hidekingerz.fuda
+            CFBundleURLSchemes: [fuda]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hidekingerz.fuda
