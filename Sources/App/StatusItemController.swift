@@ -14,8 +14,9 @@ final class StatusItemController: NSObject {
         super.init()
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "fuda")
+            button.image = NSImage(named: "MenuBarIcon")
             button.image?.isTemplate = true
+            button.image?.accessibilityDescription = "fuda"
         }
         statusItem.menu = buildMenu()
     }

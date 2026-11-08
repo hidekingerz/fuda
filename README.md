@@ -78,6 +78,20 @@ open "fuda://panel?q=sig"
 データは `~/Library/Application Support/fuda/fuda.store` に保存されます。
 環境変数 `FUDA_STORE_PATH` で保存先を差し替えられます（デモやデバッグ用）。
 
+## アイコン
+
+アプリアイコンは Icon Composer 形式の `Sources/AppIcon.icon`（macOS 26 ではガラス表現、macOS 14/15 向けの icns は自動生成）、
+メニューバーのアイコンは `Sources/Assets.xcassets/MenuBarIcon.imageset` です。絵柄は `scripts/render-icon.swift` で描いています。
+形や線を変えたいときはスクリプトを直して次を実行し、出力を差し替えてください。
+
+```sh
+swift scripts/render-icon.swift /tmp/fuda-icon
+cp /tmp/fuda-icon/tag-layer.png Sources/AppIcon.icon/Assets/tag.png
+cp /tmp/fuda-icon/menubar.png /tmp/fuda-icon/menubar@2x.png Sources/Assets.xcassets/MenuBarIcon.imageset/
+```
+
+背景色や影は `Sources/AppIcon.icon/icon.json` で指定しています（Xcode の Icon Composer でも開けます）。
+
 ## スクリーンショットの撮り直し
 
 README の画像はデモ用ストアで撮っています。実際の履歴を写さないよう、次の手順で再現できます。
