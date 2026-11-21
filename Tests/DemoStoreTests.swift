@@ -16,7 +16,7 @@ final class DemoStoreTests: XCTestCase {
         let history = HistoryStore(context: container.mainContext)
         let snippets = SnippetStore(context: container.mainContext)
 
-        try snippets.create(title: "メールの署名", content: "--\n片桐 秀樹\nhidekingerz@example.com", keyword: "sig")
+        try snippets.create(title: "メールの署名", content: "--\n山田 太郎\ntaro@example.com", keyword: "sig")
         try snippets.create(title: "レビュー依頼", content: "お手すきの際にレビューをお願いします。", keyword: "rev")
         try snippets.create(title: "日付フォーマット", content: "yyyy-MM-dd HH:mm", keyword: nil)
 

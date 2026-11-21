@@ -39,6 +39,8 @@ enum PanelSortOrder: String, CaseIterable, Identifiable {
     case newest
     case mostUsed
     case recentlyPasted
+    /// スニペットの名前順。
+    case title
 
     static let defaultsKey = "panelSortOrder"
 
@@ -49,14 +51,27 @@ enum PanelSortOrder: String, CaseIterable, Identifiable {
         case .newest: "新しい順"
         case .mostUsed: "よく使う順"
         case .recentlyPasted: "最近貼り付けた順"
+        case .title: "名前順"
         }
     }
 
-    /// 並び替え。newest は入力順をそのまま返す。
-    func sort<T>(_ items: [T], stats: (T) -> UsageStats) -> [T] {
+    /// モードに合わせた表示名。スニペットの「新しい順」は更新日時の順なので「更新順」と呼ぶ。
+    func label(in tab: PanelTab) -> String {
+        if tab == .snippets, self == .newest { return "更新順" }
+        return label
+    }
+
+    /// 並び替え。newest は入力順をそのまま返す。title は見出しの辞書順（数字は数値として比べる）。
+    func sort<T>(_ items: [T], stats: (T) -> UsageStats, title: (T) -> String = { _ in "" }) -> [T] {
         switch self {
         case .newest:
             return items
+        case .title:
+            return items.enumerated().sorted { lhs, rhs in
+                let order = title(lhs.element).localizedStandardCompare(title(rhs.element))
+                if order != .orderedSame { return order == .orderedAscending }
+                return lhs.offset < rhs.offset
+            }.map(\.element)
         case .mostUsed:
             return items.enumerated().sorted { lhs, rhs in
                 let l = stats(lhs.element), r = stats(rhs.element)

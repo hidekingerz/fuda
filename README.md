@@ -2,13 +2,14 @@
 
 macOS 用のクリップボード履歴＋スニペット管理アプリ。
 ショートカットでパネルを呼び出し、履歴または登録済みスニペットを選んで元のアプリに貼り付ける。
+パネルには「履歴」と「スニペット」の 2 つのモードがあり、⇥ で切り替える。
 
 <p align="center">
-  <img src="docs/images/panel.png" width="520" alt="fuda のパネル。ピン留めした履歴、スニペット、ファイル、テキスト履歴が並んでいる">
+  <img src="docs/images/panel.png" width="520" alt="履歴モードのパネル。ピン留めした履歴、ファイル、テキスト履歴が新しい順に並び、右端に経過時間が出ている">
 </p>
 
 <p align="center">
-  <img src="docs/images/panel-search.png" width="520" alt="検索欄に sig と入力し、キーワードが一致したスニペットが先頭に固定されている">
+  <img src="docs/images/panel-snippets.png" width="520" alt="スニペットモードのパネル。左にスニペットの一覧、右に選択中のスニペットの本文が表示されている">
 </p>
 
 ## 必要なもの
@@ -42,22 +43,27 @@ xcodebuild test -project fuda.xcodeproj -scheme fuda -destination 'platform=macO
 | 操作 | キー |
 |---|---|
 | パネルを開く／閉じる | ⌘⇧V（設定で変更可） |
+| 履歴とスニペットを切り替える | ⇥（または ⌘1 / ⌘2） |
 | 項目を選ぶ | ↑ / ↓（または ^P / ^N） |
 | コピーのみ（既定） | ⏎ |
 | 貼り付け（元のアプリへ ⌘V を送る） | ⇧⏎ |
 | 閉じる | esc |
 | スニペットを追加 | ⌘N またはパネル右上の「+」 |
 | 選択中のスニペットを編集 | ⌘E または右クリック |
-| 履歴のピン留め・削除 | 右クリック |
+| 履歴のピン留め・削除、スニペットにする | 右クリック |
 
 ⏎ の動作は設定の「Enter の動作」で「コピーのみ」「貼り付け」から選べます。⇧⏎ はもう一方の動作です。
 既定を「コピーのみ」にしているのは、改行を含む内容をターミナルに貼り付けると各行がそのまま実行されるなど、
 意図しない場所への貼り付けを避けるためです。
 
-他のツールから開くには `fuda://panel` を使います。`fuda://panel?q=sig` のように `q` を付けると検索欄にその文字列を入れた状態で開きます。`fuda://settings` で設定ウィンドウが開きます。
+パネルは前回開いていたモードで開きます。検索中に今のモードで見つからなくても、もう一方のモードで一致すれば件数を知らせます。
+スニペットモードでは右側に本文が表示されるので、中身を確かめてから貼り付けられます。
+設定の「スニペットを開く」にショートカットを割り当てると、スニペットモードで直接開けます。既定では割り当てていません。
+
+他のツールから開くには `fuda://panel` を使います。`q` を付けると検索欄にその文字列を入れた状態で、`mode` に `history` か `snippets` を付けるとそのモードで開きます。`fuda://settings` で設定ウィンドウが開きます。
 
 ```sh
-open "fuda://panel?q=sig"
+open "fuda://panel?mode=snippets&q=sig"
 ```
 
 初回起動時にアクセシビリティ権限のダイアログが出ます。「貼り付け」（元アプリへの ⌘V 送信）にだけ必要なので、
@@ -100,5 +106,9 @@ README の画像はデモ用ストアで撮っています。実際の履歴を�
 TEST_RUNNER_FUDA_DEMO_STORE=/path/to/demo.store xcodebuild test -project fuda.xcodeproj -scheme fuda \
   -destination 'platform=macOS' -derivedDataPath build/DerivedData -only-testing:fudaTests/DemoStoreTests
 FUDA_STORE_PATH=/path/to/demo.store build/DerivedData/Build/Products/Debug/fuda.app/Contents/MacOS/fuda &
-open "fuda://panel"
+open -a build/DerivedData/Build/Products/Debug/fuda.app "fuda://panel?mode=history"
+open -a build/DerivedData/Build/Products/Debug/fuda.app "fuda://panel?mode=snippets&q=sig"
 ```
+
+`/Applications` に fuda を入れている場合、`open -a` を付けないとそちらが URL を受け取り、実際の履歴が表示されます。
+撮る前に `/Applications` の fuda を終了しておいてください。

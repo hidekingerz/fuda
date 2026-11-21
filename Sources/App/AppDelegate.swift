@@ -38,6 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .togglePanel) { [weak self] in
             self?.panel?.toggle()
         }
+        KeyboardShortcuts.onKeyDown(for: .toggleSnippets) { [weak self] in
+            self?.panel?.toggle(tab: .snippets)
+        }
 
         // MVP 1: 起動時に Accessibility 権限を確認し、未許可ならシステムのプロンプトを出す
         if !AccessibilityPermission.requestIfNeeded() {
@@ -45,14 +48,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// `fuda://panel` でパネルを開く（`?q=検索語` で検索欄を埋める）。Raycast や Alfred、シェルからの呼び出し用。
+    /// `fuda://panel` でパネルを開く。`?q=検索語` で検索欄を埋め、`?mode=history|snippets` でモードを選ぶ。
+    /// Raycast や Alfred、シェルからの呼び出し用。
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "fuda" {
             switch url.host {
             case "panel":
-                let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                    .queryItems?.first { $0.name == "q" }?.value
-                panel?.show(query: query)
+                let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                let query = items.first { $0.name == "q" }?.value
+                let tab = items.first { $0.name == "mode" }?.value.flatMap(PanelTab.init(rawValue:))
+                panel?.show(query: query, tab: tab)
             case "settings": settings?.show()
             default: NSLog("未対応の URL: \(url)")
             }

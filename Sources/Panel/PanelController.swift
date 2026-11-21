@@ -48,14 +48,24 @@ final class PanelController {
 
     var isVisible: Bool { panel.isVisible }
 
-    func toggle() {
-        if panel.isVisible { hide() } else { show() }
+    /// tab を省略すると前回のモードで開く。開いているときは閉じる。
+    /// tab を指定したときに別のモードで開いていれば、閉じずにそのモードへ切り替える。
+    func toggle(tab: PanelTab? = nil) {
+        guard panel.isVisible else {
+            show(tab: tab)
+            return
+        }
+        if let tab, viewModel.tab != tab, viewModel.mode == .list {
+            viewModel.tab = tab
+        } else {
+            hide()
+        }
     }
 
-    /// query を渡すと検索欄にその文字列を入れた状態で開く。
-    func show(query: String? = nil) {
+    /// query を渡すと検索欄にその文字列を入れた状態で開く。tab を省略すると前回のモード。
+    func show(query: String? = nil, tab: PanelTab? = nil) {
         previousApp = NSWorkspace.shared.frontmostApplication
-        viewModel.resetForShow()
+        viewModel.resetForShow(tab: tab)
         if let query, !query.isEmpty {
             viewModel.query = query
         }
@@ -139,6 +149,9 @@ final class PanelController {
         case 125: // ↓
             viewModel.moveSelection(by: 1)
             return true
+        case 48 where flags.isEmpty || flags == .shift: // tab でモード切り替え
+            viewModel.toggleTab()
+            return true
         case 36, 76: // return / enter（⇧ でもう一方の動作）
             viewModel.confirmSelection(
                 action: ConfirmAction.action(enterAction: .current, shift: flags.contains(.shift))
@@ -155,6 +168,12 @@ final class PanelController {
                 return true
             case "e":
                 viewModel.beginEditSelectedSnippet()
+                return true
+            case "1":
+                viewModel.tab = .history
+                return true
+            case "2":
+                viewModel.tab = .snippets
                 return true
             default:
                 break

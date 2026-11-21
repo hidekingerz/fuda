@@ -21,6 +21,10 @@ struct SettingsView: View {
         Form {
             Section("ショートカット") {
                 KeyboardShortcuts.Recorder("パネルを開く:", name: .togglePanel)
+                KeyboardShortcuts.Recorder("スニペットを開く:", name: .toggleSnippets)
+                Text("パネルは前回のモードで開きます。開いたあとは ⇥ で履歴とスニペットを切り替えられます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("Enter の動作") {
                 Picker("⏎ で", selection: $enterAction) {
