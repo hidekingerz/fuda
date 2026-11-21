@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// 札の色。アプリアイコンの藍と生成りに合わせる。
+enum FudaColor {
+    /// アイコン背景のグラデーション上端の藍。ダークモードでも沈まない明るさにする。
+    static let indigo = Color(red: 0.24, green: 0.30, blue: 0.52)
+    static let cream = Color(red: 0.96, green: 0.93, blue: 0.85)
+}
+
 struct PanelView: View {
     @ObservedObject var viewModel: PanelViewModel
     @FocusState private var searchFocused: Bool
@@ -13,8 +20,8 @@ struct PanelView: View {
             switch viewModel.mode {
             case .list:
                 listBody
-            case .form(let snippet):
-                SnippetFormView(viewModel: viewModel, editing: snippet)
+            case .form(let snippet, let prefill):
+                SnippetFormView(viewModel: viewModel, editing: snippet, prefill: prefill)
             }
         }
         .frame(width: PanelTextSize.baseWidth * scale, height: PanelTextSize.baseHeight * scale)
@@ -26,6 +33,9 @@ struct PanelView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if viewModel.otherTabMatchCount > 0 {
+                otherTabHint
+            }
             if let message = viewModel.errorMessage {
                 Text(message)
                     .font(.system(size: 11 * scale))
@@ -33,11 +43,7 @@ struct PanelView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
             }
-            if viewModel.results.isEmpty {
-                emptyState
-            } else {
-                resultList
-            }
+            content
             Divider()
             footer
         }
@@ -45,21 +51,28 @@ struct PanelView: View {
         .onChange(of: viewModel.mode) { _, mode in
             if mode == .list { searchFocused = true }
         }
+        .onChange(of: viewModel.tab) { _, _ in searchFocused = true }
     }
 
+    // MARK: - ヘッダー
+
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            TabSwitcher(selection: $viewModel.tab)
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            TextField("履歴とスニペットを検索", text: $viewModel.query)
+            TextField(viewModel.tab == .history ? "履歴を検索" : "スニペットを検索", text: $viewModel.query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 16 * scale))
                 .focused($searchFocused)
                 .onSubmit { viewModel.confirmSelection() }
             Menu {
-                Picker("並び順", selection: $viewModel.sortOrder) {
-                    ForEach(PanelSortOrder.allCases) { order in
-                        Text(order.label).tag(order)
+                Picker("並び順", selection: Binding(
+                    get: { viewModel.sortOrder },
+                    set: { viewModel.sortOrder = $0 }
+                )) {
+                    ForEach(viewModel.tab.sortOrders) { order in
+                        Text(order.label(in: viewModel.tab)).tag(order)
                     }
                 }
                 .pickerStyle(.inline)
@@ -69,48 +82,124 @@ struct PanelView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("並び順: \(viewModel.sortOrder.label)")
-            Button {
-                viewModel.beginNewSnippet()
-            } label: {
-                Image(systemName: "plus")
+            .help("並び順: \(viewModel.sortOrder.label(in: viewModel.tab))")
+            if viewModel.tab == .snippets {
+                Button {
+                    viewModel.beginNewSnippet()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.borderless)
+                .help("スニペットを追加 (⌘N)")
             }
-            .buttonStyle(.borderless)
-            .help("スニペットを追加 (⌘N)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
     }
 
+    /// 今のモードで見つからなくても、もう一方にあることを知らせる。
+    private var otherTabHint: some View {
+        Button {
+            viewModel.toggleTab()
+        } label: {
+            HStack(spacing: 6) {
+                Text("\(viewModel.tab.other.label)\(viewModel.results.isEmpty ? "に" : "にも") \(viewModel.otherTabMatchCount) 件あります")
+                KeyHint(key: "⇥", label: "切り替え")
+                Spacer()
+            }
+            .font(.system(size: 11 * scale))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(FudaColor.indigo.opacity(0.08))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 本体
+
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.tab {
+        case .history:
+            if viewModel.results.isEmpty {
+                emptyState
+            } else {
+                resultList(doubleClickToConfirm: false) { index, entry in
+                    HistoryRow(
+                        entry: entry,
+                        isSelected: index == viewModel.selectedIndex,
+                        usageCount: viewModel.usageCount(for: entry)
+                    )
+                }
+            }
+        case .snippets:
+            HStack(spacing: 0) {
+                Group {
+                    if viewModel.results.isEmpty {
+                        emptyState
+                    } else {
+                        resultList(doubleClickToConfirm: true) { index, entry in
+                            SnippetRow(
+                                entry: entry,
+                                isSelected: index == viewModel.selectedIndex,
+                                isKeywordMatch: viewModel.keywordMatches.contains(entry.id)
+                            )
+                        }
+                    }
+                }
+                .frame(width: PanelTextSize.baseWidth * scale * 0.4)
+                Divider()
+                SnippetPreview(
+                    entry: viewModel.selectedEntry,
+                    usageCount: viewModel.selectedEntry.map(viewModel.usageCount(for:)) ?? 0
+                )
+            }
+        }
+    }
+
     private var emptyState: some View {
         VStack(spacing: 6) {
             Spacer()
-            Image(systemName: "doc.on.clipboard")
+            Image(systemName: viewModel.tab == .history ? "doc.on.clipboard" : "text.quote")
                 .font(.system(size: 28 * scale))
                 .foregroundStyle(.tertiary)
-            Text(viewModel.query.isEmpty ? "履歴はまだありません" : "一致する項目がありません")
+            Text(emptyMessage)
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Spacer()
         }
+        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity)
     }
 
-    private var resultList: some View {
+    private var emptyMessage: String {
+        if !viewModel.query.isEmpty { return "一致する項目がありません" }
+        switch viewModel.tab {
+        case .history: return "コピーした内容がここに並びます"
+        case .snippets: return "⌘N でスニペットを追加します"
+        }
+    }
+
+    /// スニペットはプレビューを見て選ぶので、クリックで選択、ダブルクリックで確定にする。
+    private func resultList<Row: View>(
+        doubleClickToConfirm: Bool,
+        @ViewBuilder row: @escaping (Int, PanelEntry) -> Row
+    ) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, entry in
-                        PanelRow(
-                            entry: entry,
-                            isSelected: index == viewModel.selectedIndex,
-                            isKeywordMatch: viewModel.keywordMatches.contains(entry.id),
-                            usageCount: viewModel.usageCount(for: entry)
-                        )
+                        row(index, entry)
                             .id(entry.id)
                             .contentShape(Rectangle())
-                            .onTapGesture {
+                            .onTapGesture(count: doubleClickToConfirm ? 2 : 1) {
                                 viewModel.selectedIndex = index
                                 viewModel.confirmSelection()
+                            }
+                            .onTapGesture {
+                                viewModel.selectedIndex = index
                             }
                             .contextMenu { contextMenu(for: entry) }
                     }
@@ -130,7 +219,10 @@ struct PanelView: View {
         Button("コピー") { viewModel.confirm(entry, action: .copyOnly) }
         Divider()
         switch entry {
-        case .history:
+        case .history(let item):
+            if item.type == .text {
+                Button("スニペットにする") { viewModel.beginSnippet(from: entry) }
+            }
             Button(entry.isPinned ? "ピンを外す" : "ピン留め") { viewModel.togglePinned(entry) }
             Button("削除", role: .destructive) { viewModel.delete(entry) }
         case .snippet(let snippet):
@@ -139,17 +231,21 @@ struct PanelView: View {
         }
     }
 
+    // MARK: - フッター
+
     private var footer: some View {
         HStack(spacing: 14) {
-            KeyHint(key: "↑↓", label: "選択")
             KeyHint(key: "⏎", label: enterAction.shortLabel)
             KeyHint(key: "⇧⏎", label: enterAction.alternate.shortLabel)
-            KeyHint(key: "⌘N", label: "スニペット追加")
-            KeyHint(key: "⌘E", label: "編集")
+            if viewModel.tab == .snippets {
+                KeyHint(key: "⌘N", label: "追加")
+                KeyHint(key: "⌘E", label: "編集")
+            }
+            KeyHint(key: "⇥", label: viewModel.tab.other.label)
             KeyHint(key: "esc", label: "閉じる")
             Spacer()
-            if viewModel.sortOrder != .newest {
-                Text(viewModel.sortOrder.label)
+            if viewModel.sortOrder != viewModel.tab.defaultSort {
+                Text(viewModel.sortOrder.label(in: viewModel.tab))
                     .foregroundStyle(.secondary)
             }
             Text("\(viewModel.results.count) 件")
@@ -161,11 +257,47 @@ struct PanelView: View {
     }
 }
 
-private struct PanelRow: View {
+// MARK: - モード切り替え
+
+/// 履歴とスニペットを切り替えるタブ。選択中は札の藍と生成りで塗る。
+private struct TabSwitcher: View {
+    @Environment(\.panelTextScale) private var scale
+    @Binding var selection: PanelTab
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(PanelTab.allCases) { tab in
+                let isSelected = selection == tab
+                Button {
+                    selection = tab
+                } label: {
+                    Text(tab.label)
+                        .font(.system(size: 12 * scale, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? FudaColor.cream : Color.secondary)
+                        .padding(.horizontal, 8 * scale)
+                        .padding(.vertical, 3 * scale)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(isSelected ? FudaColor.indigo : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 7).fill(.quaternary))
+        .help("⇥ で切り替え")
+    }
+}
+
+// MARK: - 行
+
+private struct HistoryRow: View {
     @Environment(\.panelTextScale) private var scale
     let entry: PanelEntry
     let isSelected: Bool
-    let isKeywordMatch: Bool
     let usageCount: Int
 
     var body: some View {
@@ -175,59 +307,44 @@ private struct PanelRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title.isEmpty ? "(空白)" : entry.title)
                     .lineLimit(1)
-                    .font(.system(size: 13 * scale, weight: entry.isSnippet ? .semibold : .regular))
+                    .font(.system(size: 13 * scale))
                 if let subtitle = entry.subtitle {
                     Text(subtitle)
                         .lineLimit(1)
                         .font(.system(size: 11 * scale))
-                        .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                        .foregroundStyle(secondaryStyle)
                 }
             }
             Spacer()
             if usageCount > 0 {
                 Text("×\(usageCount)")
                     .font(.system(size: 10 * scale, design: .rounded))
-                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                    .foregroundStyle(secondaryStyle)
                     .help("貼り付け回数")
             }
             if !entry.isPastable {
                 Text("見つかりません")
                     .font(.system(size: 10 * scale))
-                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                    .foregroundStyle(secondaryStyle)
             }
-            if entry.isSnippet {
-                Text(badgeText)
-                    .font(.system(size: 10 * scale, weight: isKeywordMatch ? .semibold : .regular))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(badgeBackground))
+            if let createdAt = entry.historyItem?.createdAt {
+                Text(RelativeTime.text(for: createdAt))
+                    .font(.system(size: 10 * scale))
+                    .foregroundStyle(secondaryStyle)
+                    .monospacedDigit()
             }
         }
         .foregroundStyle(isSelected ? .white : .primary)
         .opacity(entry.isPastable ? 1 : 0.5)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor : .clear)
-        )
-    }
-}
-
-private extension PanelRow {
-    var badgeText: String {
-        if isKeywordMatch, let keyword = entry.keyword { return "keyword: \(keyword)" }
-        if let keyword = entry.keyword { return keyword }
-        return "snippet"
+        .rowBackground(isSelected: isSelected)
     }
 
-    var badgeBackground: Color {
-        if isSelected { return .white.opacity(0.25) }
-        return isKeywordMatch ? Color.orange.opacity(0.3) : Color.accentColor.opacity(0.15)
+    private var secondaryStyle: Color {
+        isSelected ? .white.opacity(0.8) : .secondary
     }
 
     @ViewBuilder
-    var icon: some View {
+    private var icon: some View {
         if let item = entry.historyItem, item.type == .file, let url = item.fileURLs.first {
             Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                 .resizable()
@@ -240,9 +357,105 @@ private extension PanelRow {
                 .clipShape(RoundedRectangle(cornerRadius: 3))
                 .overlay(RoundedRectangle(cornerRadius: 3).stroke(.quaternary))
         } else {
-            Image(systemName: entry.isSnippet ? "text.quote" : (entry.isPinned ? "pin.fill" : "doc.on.clipboard"))
+            Image(systemName: entry.isPinned ? "pin.fill" : "doc.on.clipboard")
                 .foregroundStyle(isSelected ? .white : .secondary)
         }
+    }
+}
+
+private struct SnippetRow: View {
+    @Environment(\.panelTextScale) private var scale
+    let entry: PanelEntry
+    let isSelected: Bool
+    let isKeywordMatch: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(entry.title)
+                .lineLimit(1)
+                .font(.system(size: 13 * scale, weight: .semibold))
+            Spacer(minLength: 4)
+            if let keyword = entry.keyword {
+                KeywordBadge(keyword: keyword, isSelected: isSelected, isMatch: isKeywordMatch)
+            }
+        }
+        .foregroundStyle(isSelected ? .white : .primary)
+        .rowBackground(isSelected: isSelected)
+    }
+}
+
+private struct KeywordBadge: View {
+    @Environment(\.panelTextScale) private var scale
+    let keyword: String
+    let isSelected: Bool
+    let isMatch: Bool
+
+    var body: some View {
+        Text(keyword)
+            .font(.system(size: 10 * scale, weight: isMatch ? .semibold : .regular))
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(background))
+            .help(isMatch ? "キーワードが一致" : "キーワード")
+    }
+
+    private var background: Color {
+        if isSelected { return .white.opacity(0.25) }
+        return isMatch ? Color.orange.opacity(0.3) : Color.accentColor.opacity(0.15)
+    }
+}
+
+/// 選択中のスニペットの中身。貼る前に確かめられるようにする。
+private struct SnippetPreview: View {
+    @Environment(\.panelTextScale) private var scale
+    let entry: PanelEntry?
+    let usageCount: Int
+
+    var body: some View {
+        if case .snippet(let snippet)? = entry {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(snippet.title)
+                    .font(.system(size: 15 * scale, weight: .semibold))
+                    .lineLimit(2)
+                HStack(spacing: 10) {
+                    if let keyword = snippet.keyword {
+                        Label(keyword, systemImage: "character.cursor.ibeam")
+                    }
+                    Text("更新 \(RelativeTime.shortDate(snippet.updatedAt))")
+                    if usageCount > 0 {
+                        Text("\(usageCount) 回使用")
+                    }
+                }
+                .font(.system(size: 11 * scale))
+                .foregroundStyle(.secondary)
+                Divider()
+                ScrollView {
+                    Text(snippet.content)
+                        .font(.system(size: 12 * scale, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            Text("スニペットを選ぶと内容を表示します")
+                .font(.system(size: 12 * scale))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+private extension View {
+    func rowBackground(isSelected: Bool) -> some View {
+        padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.accentColor : .clear)
+            )
     }
 }
 

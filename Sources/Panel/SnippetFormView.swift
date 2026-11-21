@@ -4,6 +4,8 @@ import SwiftUI
 struct SnippetFormView: View {
     @ObservedObject var viewModel: PanelViewModel
     let editing: Snippet?
+    /// 履歴から作るときの初期内容。
+    let prefill: String?
 
     @State private var title: String
     @State private var content: String
@@ -11,17 +13,18 @@ struct SnippetFormView: View {
     @FocusState private var titleFocused: Bool
     @Environment(\.panelTextScale) private var scale
 
-    init(viewModel: PanelViewModel, editing: Snippet?) {
+    init(viewModel: PanelViewModel, editing: Snippet?, prefill: String? = nil) {
         self.viewModel = viewModel
         self.editing = editing
-        _title = State(initialValue: editing?.title ?? "")
-        _content = State(initialValue: editing?.content ?? "")
+        self.prefill = prefill
+        _title = State(initialValue: editing?.title ?? prefill.map { String($0.firstLine.prefix(40)) } ?? "")
+        _content = State(initialValue: editing?.content ?? prefill ?? "")
         _keyword = State(initialValue: editing?.keyword ?? "")
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(editing == nil ? "スニペットを追加" : "スニペットを編集")
+            Text(heading)
                 .font(.system(size: 15 * scale, weight: .semibold))
 
             TextField("タイトル", text: $title)
@@ -63,5 +66,10 @@ struct SnippetFormView: View {
         }
         .padding(14)
         .onAppear { titleFocused = true }
+    }
+
+    private var heading: String {
+        if editing != nil { return "スニペットを編集" }
+        return prefill == nil ? "スニペットを追加" : "履歴からスニペットを作成"
     }
 }

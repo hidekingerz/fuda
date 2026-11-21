@@ -2,31 +2,36 @@ import AppKit
 import Foundation
 import SwiftData
 
-/// パネルの状態。一覧・検索・選択・スニペットフォームを管理する。
+/// パネルの状態。モード（履歴／スニペット）・検索・選択・スニペットフォームを管理する。
 @MainActor
 final class PanelViewModel: ObservableObject {
     enum Mode: Equatable {
         case list
-        case form(editing: Snippet?)
+        /// prefill は履歴からスニペットを作るときの初期内容。
+        case form(editing: Snippet?, prefill: String?)
     }
 
     @Published var query: String = "" {
         didSet { applyFilter(resetSelection: true) }
     }
+    /// 今表示しているモード。最後に開いていたモードを覚える。
+    @Published var tab: PanelTab {
+        didSet {
+            guard tab != oldValue else { return }
+            defaults.set(tab.rawValue, forKey: PanelTab.defaultsKey)
+            applyFilter(resetSelection: true)
+        }
+    }
     @Published private(set) var results: [PanelEntry] = []
+    /// 検索中に、もう一方のモードで一致する件数。
+    @Published private(set) var otherTabMatchCount = 0
     /// 検索文字列とキーワードが完全一致している項目の ID。
     @Published private(set) var keywordMatches: Set<PanelEntry.ID> = []
     @Published var selectedIndex: Int = 0
     @Published var mode: Mode = .list
     @Published var errorMessage: String?
-    @Published var sortOrder: PanelSortOrder = PanelSortOrder(
-        rawValue: UserDefaults.standard.string(forKey: PanelSortOrder.defaultsKey) ?? ""
-    ) ?? .newest {
-        didSet {
-            UserDefaults.standard.set(sortOrder.rawValue, forKey: PanelSortOrder.defaultsKey)
-            applyFilter(resetSelection: true)
-        }
-    }
+    @Published private(set) var historySort: PanelSortOrder
+    @Published private(set) var snippetSort: PanelSortOrder
     /// 項目ごとの貼り付け回数と最終貼り付け日時。
     @Published private(set) var usage: [PanelEntry.ID: UsageStats] = [:]
 
@@ -38,12 +43,31 @@ final class PanelViewModel: ObservableObject {
     private let historyStore: HistoryStore
     private let snippetStore: SnippetStore
     private let pasteEventStore: PasteEventStore
-    private var allEntries: [PanelEntry] = []
+    private let defaults: UserDefaults
+    private var historyEntries: [PanelEntry] = []
+    private var snippetEntries: [PanelEntry] = []
 
-    init(context: ModelContext) {
+    init(context: ModelContext, defaults: UserDefaults = .standard) {
         self.historyStore = HistoryStore(context: context)
         self.snippetStore = SnippetStore(context: context)
         self.pasteEventStore = PasteEventStore(context: context)
+        self.defaults = defaults
+        self.tab = PanelTab.resolve(defaults.string(forKey: PanelTab.defaultsKey))
+        self.historySort = PanelTab.history.resolveSort(defaults.string(forKey: PanelTab.history.sortDefaultsKey))
+        self.snippetSort = PanelTab.snippets.resolveSort(defaults.string(forKey: PanelTab.snippets.sortDefaultsKey))
+    }
+
+    /// 今のモードの並び順。
+    var sortOrder: PanelSortOrder {
+        get { tab == .history ? historySort : snippetSort }
+        set {
+            switch tab {
+            case .history: historySort = newValue
+            case .snippets: snippetSort = newValue
+            }
+            defaults.set(newValue.rawValue, forKey: tab.sortDefaultsKey)
+            applyFilter(resetSelection: true)
+        }
     }
 
     var selectedEntry: PanelEntry? {
@@ -54,14 +78,12 @@ final class PanelViewModel: ObservableObject {
 
     func reload() {
         do {
-            let snippets = try snippetStore.fetchAll().map(PanelEntry.snippet)
+            snippetEntries = try snippetStore.fetchAll().map(PanelEntry.snippet)
             let history = try historyStore.fetchAll().map(PanelEntry.history)
-            // pinned → スニペット → 通常の履歴 の順
-            let pinned = history.filter(\.isPinned)
-            let unpinned = history.filter { !$0.isPinned }
-            allEntries = pinned + snippets + unpinned
+            // ピン留め → 通常の履歴 の順
+            historyEntries = history.filter(\.isPinned) + history.filter { !$0.isPinned }
             let stats = try pasteEventStore.usageStats()
-            usage = Dictionary(uniqueKeysWithValues: allEntries.compactMap { entry in
+            usage = Dictionary(uniqueKeysWithValues: (historyEntries + snippetEntries).compactMap { entry in
                 stats[PasteEvent.encode(entry.id)].map { (entry.id, $0) }
             })
             applyFilter(resetSelection: false)
@@ -70,24 +92,38 @@ final class PanelViewModel: ObservableObject {
         }
     }
 
-    func resetForShow() {
+    /// パネルを開く直前に呼ぶ。tab を渡すとそのモードで開き、省略すると前回のモードのまま。
+    func resetForShow(tab: PanelTab? = nil) {
         query = ""
+        if let tab { self.tab = tab }
         mode = .list
         errorMessage = nil
         reload()
         selectedIndex = 0
     }
 
+    private func entries(for tab: PanelTab) -> [PanelEntry] {
+        tab == .history ? historyEntries : snippetEntries
+    }
+
     private func applyFilter(resetSelection: Bool) {
-        let sorted = sortOrder.sort(allEntries) { usage[$0.id] ?? UsageStats() }
+        let sorted = sortOrder.sort(entries(for: tab), stats: { usage[$0.id] ?? UsageStats() }, title: \.title)
         results = PanelSearch.rank(sorted, query: query, text: \.searchableText, keyword: \.keyword)
         keywordMatches = Set(results.filter { PanelSearch.matchesKeyword($0.keyword, query: query) }.map(\.id))
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        otherTabMatchCount = trimmed.isEmpty
+            ? 0
+            : PanelSearch.filter(entries(for: tab.other), query: query, text: \.searchableText).count
         if resetSelection || !results.indices.contains(selectedIndex) {
             selectedIndex = 0
         }
     }
 
     // MARK: - キー操作
+
+    func toggleTab() {
+        tab = tab.other
+    }
 
     func moveSelection(by delta: Int) {
         guard !results.isEmpty else { return }
@@ -153,17 +189,26 @@ final class PanelViewModel: ObservableObject {
 
     // MARK: - スニペットフォーム
 
+    /// 新しいスニペットのフォームを開く。スニペットモードへ切り替える。
     func beginNewSnippet() {
-        mode = .form(editing: nil)
+        tab = .snippets
+        mode = .form(editing: nil, prefill: nil)
+    }
+
+    /// テキストの履歴を初期内容にしてスニペットのフォームを開く。
+    func beginSnippet(from entry: PanelEntry) {
+        guard let item = entry.historyItem, item.type == .text else { return }
+        tab = .snippets
+        mode = .form(editing: nil, prefill: item.content)
     }
 
     func beginEditSelectedSnippet() {
-        guard case .snippet(let snippet)? = selectedEntry else { return }
-        mode = .form(editing: snippet)
+        guard tab == .snippets, case .snippet(let snippet)? = selectedEntry else { return }
+        mode = .form(editing: snippet, prefill: nil)
     }
 
     func beginEdit(_ snippet: Snippet) {
-        mode = .form(editing: snippet)
+        mode = .form(editing: snippet, prefill: nil)
     }
 
     func cancelForm() {
@@ -177,14 +222,20 @@ final class PanelViewModel: ObservableObject {
             return
         }
         do {
+            let saved: Snippet
             if let snippet {
                 try snippetStore.update(snippet, title: trimmedTitle, content: content, keyword: keyword)
+                saved = snippet
             } else {
-                try snippetStore.create(title: trimmedTitle, content: content, keyword: keyword)
+                saved = try snippetStore.create(title: trimmedTitle, content: content, keyword: keyword)
             }
             errorMessage = nil
             mode = .list
             reload()
+            // 保存したスニペットを選択状態にする
+            if let index = results.firstIndex(where: { $0.id == saved.persistentModelID }) {
+                selectedIndex = index
+            }
         } catch {
             errorMessage = "保存に失敗しました: \(error.localizedDescription)"
         }
